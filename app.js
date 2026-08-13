@@ -62,6 +62,7 @@ const STATS_STORAGE_KEY = "common-ground-stats";
 const GROUP_STORAGE_KEY = "common-ground-group";
 const LOCAL_SCORES_KEY = "common-ground-scores";
 const THEME_STORAGE_KEY = "common-ground-theme";
+const RAINBOW_SPEED_STORAGE_KEY = "common-ground-rainbow-speed";
 const THEME_NAMES = new Set(["classic", "ocean", "lavender", "sunset", "rainbow"]);
 const db = window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -102,6 +103,17 @@ function applyTheme(theme, persist = false) {
   document.querySelectorAll("[data-theme-choice]").forEach((option) => {
     option.setAttribute("aria-checked", String(option.dataset.themeChoice === selectedTheme));
   });
+}
+
+function setRainbowSpeed(value, persist = false) {
+  const speed = Math.min(10, Math.max(1, Number(value) || 7));
+  const duration = 15 - speed;
+  document.documentElement.style.setProperty("--rainbow-speed", `${duration}s`);
+  const slider = $("rainbowSpeed");
+  const output = $("rainbowSpeedValue");
+  if (slider) slider.value = speed;
+  if (output) output.textContent = speed <= 3 ? "Slow" : speed >= 8 ? "Fast" : "Medium";
+  if (persist) saveLocal(RAINBOW_SPEED_STORAGE_KEY, speed);
 }
 
 function hashString(value) {
@@ -397,6 +409,7 @@ function wireUI() {
   $("statsButton").addEventListener("click", () => { renderStats(); openModal($("statsModal")); });
   $("themeButton").addEventListener("click", () => openModal($("themeModal")));
   document.querySelectorAll("[data-theme-choice]").forEach((option) => option.addEventListener("click", () => applyTheme(option.dataset.themeChoice, true)));
+  $("rainbowSpeed").addEventListener("input", (event) => setRainbowSpeed(event.target.value, true));
   $("accountButton").addEventListener("click", () => openModal($("accountModal")));
   $("createGroupButton").addEventListener("click", () => { state.groupModalMode = "create"; $("groupModalEyebrow").textContent = "Start a circle"; $("groupModalTitle").textContent = "Create your group."; $("groupModalCopy").textContent = "Give your group a name, then share the invite code with your people."; $("groupInputLabel").textContent = "Group name"; $("groupInput").placeholder = "Sunday coffee club"; $("groupSubmit").textContent = "Create group"; $("groupInput").value = ""; openModal($("groupModal")); });
   $("joinGroupButton").addEventListener("click", () => { state.groupModalMode = "join"; $("groupModalEyebrow").textContent = "Join a circle"; $("groupModalTitle").textContent = "Enter the invite code."; $("groupModalCopy").textContent = "Your friend can find this six-character code in their group card."; $("groupInputLabel").textContent = "Invite code"; $("groupInput").placeholder = "ABC123"; $("groupSubmit").textContent = "Join group"; $("groupInput").value = ""; openModal($("groupModal")); });
@@ -410,6 +423,7 @@ function wireUI() {
 
 async function init() {
   applyTheme(loadLocal(THEME_STORAGE_KEY, "classic"));
+  setRainbowSpeed(loadLocal(RAINBOW_SPEED_STORAGE_KEY, 7));
   wireUI();
   $("gameDate").textContent = formatDate(TODAY, { weekday: "short", month: "short", day: "numeric" });
   $("leaderboardDate").textContent = formatDate(TODAY);
