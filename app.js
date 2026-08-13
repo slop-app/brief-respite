@@ -61,6 +61,8 @@ const GAME_STORAGE_KEY = `common-ground-game-${TODAY}`;
 const STATS_STORAGE_KEY = "common-ground-stats";
 const GROUP_STORAGE_KEY = "common-ground-group";
 const LOCAL_SCORES_KEY = "common-ground-scores";
+const THEME_STORAGE_KEY = "common-ground-theme";
+const THEME_NAMES = new Set(["classic", "ocean", "lavender", "sunset"]);
 const db = window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -91,6 +93,16 @@ function loadLocal(key, fallback = null) {
 }
 
 function saveLocal(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+function applyTheme(theme, persist = false) {
+  const selectedTheme = THEME_NAMES.has(theme) ? theme : "classic";
+  if (selectedTheme === "classic") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = selectedTheme;
+  if (persist) saveLocal(THEME_STORAGE_KEY, selectedTheme);
+  document.querySelectorAll("[data-theme-choice]").forEach((option) => {
+    option.setAttribute("aria-checked", String(option.dataset.themeChoice === selectedTheme));
+  });
+}
 
 function hashString(value) {
   return [...value].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
@@ -239,12 +251,14 @@ function initials(name) { return (name || "G").trim().split(/\s+/).map((part) =>
 
 function renderGroup() {
   const group = state.group;
+  const members = Array.isArray(group?.members) ? group.members : [];
+  const memberCount = members.length;
   $("groupName").textContent = group ? group.name : "No group yet";
-  $("groupDescription").textContent = group ? `${group.members?.length || 1} people are in this circle. Share the code and compare today’s solve.` : "Create a group or join one with a code. Compare today’s solve with your people.";
+  $("groupDescription").textContent = group ? `${memberCount} ${memberCount === 1 ? "person is" : "people are"} in this circle. Share the code and compare today’s solve.` : "Create a group or join one with a code. Compare today’s solve with your people.";
   $("groupCode").hidden = !group;
   if (group) { $("groupCode").querySelector("strong").textContent = group.code; }
   $("memberStack").hidden = !group;
-  $("memberStack").innerHTML = group ? [...(group.members || [{ name: "You" }]).slice(0, 4).map((member) => `<span class="member">${initials(member.name)}</span>`), `<span class="member-count">${group.members?.length || 1} in the circle</span>`].join("") : "";
+  $("memberStack").innerHTML = group ? [...members.slice(0, 4).map((member) => `<span class="member">${initials(member.name)}</span>`), `<span class="member-count">${memberCount} in the circle</span>`].join("") : "";
   $("modeStatus").innerHTML = group ? `<span class="status-dot"></span> ${group.name}` : '<span class="status-dot"></span> Playing solo';
   renderLeaderboard();
 }
@@ -311,8 +325,10 @@ async function loadRemoteGroup() {
   const { data, error } = await db.from("group_members").select("group_id, groups(id, name, code)").eq("user_id", state.user.id).limit(1).maybeSingle();
   if (error || !data?.groups) { renderGroup(); return; }
   const group = data.groups;
-  const members = await db.from("group_members").select("user_id, profiles(display_name)").eq("group_id", group.id);
-  state.group = { ...group, members: (members.data || []).map((member) => ({ name: member.profiles?.display_name || "Player" })) };
+  const members = await db.rpc("get_group_members", { input_group_id: group.id });
+  if (members.error) console.warn("Could not load circle members", members.error);
+  const knownMembers = state.group?.id === group.id ? state.group.members : [];
+  state.group = { ...group, members: members.error ? knownMembers : (members.data || []).map((member) => ({ name: member.display_name || "Player" })) };
   saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); await loadRemoteLeaderboard();
 }
 
@@ -353,6 +369,8 @@ function wireUI() {
   document.addEventListener("keydown", (event) => { if (event.ctrlKey || event.metaKey || event.altKey) return; if (event.key === "Enter") handleKey("enter"); else if (event.key === "Backspace") handleKey("backspace"); else if (/^[a-zA-Z]$/.test(event.key)) handleKey(event.key.toLowerCase()); });
   $("helpButton").addEventListener("click", () => openModal($("helpModal")));
   $("statsButton").addEventListener("click", () => { renderStats(); openModal($("statsModal")); });
+  $("themeButton").addEventListener("click", () => openModal($("themeModal")));
+  document.querySelectorAll("[data-theme-choice]").forEach((option) => option.addEventListener("click", () => applyTheme(option.dataset.themeChoice, true)));
   $("accountButton").addEventListener("click", () => openModal($("accountModal")));
   $("createGroupButton").addEventListener("click", () => { state.groupModalMode = "create"; $("groupModalEyebrow").textContent = "Start a circle"; $("groupModalTitle").textContent = "Create your group."; $("groupModalCopy").textContent = "Give your group a name, then share the invite code with your people."; $("groupInputLabel").textContent = "Group name"; $("groupInput").placeholder = "Sunday coffee club"; $("groupSubmit").textContent = "Create group"; $("groupInput").value = ""; openModal($("groupModal")); });
   $("joinGroupButton").addEventListener("click", () => { state.groupModalMode = "join"; $("groupModalEyebrow").textContent = "Join a circle"; $("groupModalTitle").textContent = "Enter the invite code."; $("groupModalCopy").textContent = "Your friend can find this six-character code in their group card."; $("groupInputLabel").textContent = "Invite code"; $("groupInput").placeholder = "ABC123"; $("groupSubmit").textContent = "Join group"; $("groupInput").value = ""; openModal($("groupModal")); });
@@ -365,6 +383,7 @@ function wireUI() {
 }
 
 async function init() {
+  applyTheme(loadLocal(THEME_STORAGE_KEY, "classic"));
   $("gameDate").textContent = formatDate(TODAY, { weekday: "short", month: "short", day: "numeric" });
   $("leaderboardDate").textContent = formatDate(TODAY);
   const [answer, validWords] = await Promise.all([getDailyWord(), getValidGuesses()]);

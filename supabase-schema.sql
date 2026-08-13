@@ -131,6 +131,30 @@ $$;
 revoke all on function public.join_group_by_code(text) from public;
 grant execute on function public.join_group_by_code(text) to authenticated;
 
+-- Return a circle's members only to people already in that circle. This keeps
+-- membership private outside the group while letting the in-app count be accurate.
+create or replace function public.get_group_members(input_group_id uuid)
+returns table (user_id uuid, display_name text)
+language sql
+security definer
+set search_path = public
+as $$
+  select gm.user_id, coalesce(p.display_name, 'Player')
+  from public.group_members gm
+  join public.profiles p on p.id = gm.user_id
+  where gm.group_id = input_group_id
+    and exists (
+      select 1
+      from public.group_members viewer_membership
+      where viewer_membership.group_id = input_group_id
+        and viewer_membership.user_id = auth.uid()
+    )
+  order by gm.joined_at asc;
+$$;
+
+revoke all on function public.get_group_members(uuid) from public;
+grant execute on function public.get_group_members(uuid) to authenticated;
+
 create policy "members can view scores" on public.scores for select to authenticated using (
   user_id = auth.uid() or exists (select 1 from public.group_members gm where gm.group_id = public.scores.group_id and gm.user_id = auth.uid())
 );
