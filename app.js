@@ -249,6 +249,20 @@ function renderStats() {
 
 function initials(name) { return (name || "G").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(); }
 
+function mergeGroupMembers(scoreRows) {
+  if (!state.group || !Array.isArray(scoreRows)) return;
+  const members = Array.isArray(state.group.members) ? [...state.group.members] : [];
+  scoreRows.forEach((row) => {
+    let index = members.findIndex((member) => row.userId && member.userId === row.userId);
+    if (index === -1 && row.isYou) index = members.findIndex((member) => member.isYou || member.name === "You");
+    if (index === -1) index = members.findIndex((member) => member.name?.toLowerCase() === row.name?.toLowerCase());
+    const member = { userId: row.userId, name: row.name, isYou: row.isYou };
+    if (index === -1) members.push(member); else members[index] = { ...members[index], ...member };
+  });
+  state.group.members = members;
+  saveLocal(GROUP_STORAGE_KEY, state.group);
+}
+
 function renderGroup() {
   const group = state.group;
   const members = Array.isArray(group?.members) ? group.members : [];
@@ -292,7 +306,10 @@ async function loadRemoteLeaderboard() {
   if (!db || !state.group) return;
   const { data, error } = await db.from("scores").select("user_id, attempts, won, profiles(display_name)").eq("group_id", state.group.id).eq("game_date", TODAY).order("won", { ascending: false }).order("attempts", { ascending: true });
   if (error) { console.warn("Could not load leaderboard", error); return; }
-  renderLeaderboard((data || []).map((row) => ({ name: row.profiles?.display_name || "Player", attempts: row.attempts, won: row.won, isYou: row.user_id === state.user?.id })));
+  const rows = (data || []).map((row) => ({ userId: row.user_id, name: row.profiles?.display_name || "Player", attempts: row.attempts, won: row.won, isYou: row.user_id === state.user?.id }));
+  mergeGroupMembers(rows);
+  renderGroup();
+  renderLeaderboard(rows);
 }
 
 function makeInviteCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
@@ -304,7 +321,7 @@ async function createGroup(name) {
     const { data, error } = await db.from("groups").insert({ name, code, owner_id: state.user.id }).select().single();
     if (error) return showToast(error.message);
     await db.from("group_members").insert({ group_id: data.id, user_id: state.user.id });
-    state.group = { ...data, members: [{ name: "You" }] }; saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); closeModal($("groupModal")); showToast("Group created — share the code."); return;
+    state.group = { ...data, members: [{ userId: state.user.id, name: state.user.user_metadata?.display_name || "You", isYou: true }] }; saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); closeModal($("groupModal")); showToast("Group created — share the code."); return;
   }
   state.group = { id: `local-${Date.now()}`, name, code: makeInviteCode(), members: [{ name: "You" }] }; saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); closeModal($("groupModal")); showToast("Local group created — share the code when you connect Supabase.");
 }
@@ -315,7 +332,7 @@ async function joinGroup(code) {
   if (db) {
     const { data, error } = await db.rpc("join_group_by_code", { input_code: code });
     if (error || !data?.length) return showToast(error?.message || "We couldn’t find that group code.");
-    state.group = { ...data[0], members: [{ name: "You" }] }; saveLocal(GROUP_STORAGE_KEY, state.group); await loadRemoteGroup(); closeModal($("groupModal")); showToast(`You joined ${data[0].name}.`); return;
+    state.group = { ...data[0], members: [{ userId: state.user.id, name: state.user.user_metadata?.display_name || "You", isYou: true }] }; saveLocal(GROUP_STORAGE_KEY, state.group); await loadRemoteGroup(); closeModal($("groupModal")); showToast(`You joined ${data[0].name}.`); return;
   }
   state.group = { id: `local-${code}`, name: "Shared circle", code, members: [{ name: "You" }] }; saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); closeModal($("groupModal")); showToast("Local group joined in this browser.");
 }
@@ -328,14 +345,23 @@ async function loadRemoteGroup() {
   const members = await db.rpc("get_group_members", { input_group_id: group.id });
   if (members.error) console.warn("Could not load circle members", members.error);
   const knownMembers = state.group?.id === group.id ? state.group.members : [];
-  state.group = { ...group, members: members.error ? knownMembers : (members.data || []).map((member) => ({ name: member.display_name || "Player" })) };
+  state.group = { ...group, members: members.error ? knownMembers : (members.data || []).map((member) => ({ userId: member.user_id, name: member.display_name || "Player", isYou: member.user_id === state.user.id })) };
   saveLocal(GROUP_STORAGE_KEY, state.group); renderGroup(); await loadRemoteLeaderboard();
 }
 
 function showAccount(copy) { $("accountCopy").textContent = copy || "No email or password needed. We’ll create a lightweight player profile for this browser."; openModal($("accountModal")); }
 
-function openModal(dialog) { if (!dialog.open) dialog.showModal(); }
-function closeModal(dialog) { if (dialog?.open) dialog.close(); }
+function openModal(dialog) {
+  if (!dialog || dialog.open) return;
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  else dialog.setAttribute("open", "");
+}
+
+function closeModal(dialog) {
+  if (!dialog?.open) return;
+  if (typeof dialog.close === "function") dialog.close();
+  else dialog.removeAttribute("open");
+}
 
 async function handleAuthSubmit(event) {
   event.preventDefault(); const displayName = $("displayNameInput").value.trim();
@@ -384,13 +410,14 @@ function wireUI() {
 
 async function init() {
   applyTheme(loadLocal(THEME_STORAGE_KEY, "classic"));
+  wireUI();
   $("gameDate").textContent = formatDate(TODAY, { weekday: "short", month: "short", day: "numeric" });
   $("leaderboardDate").textContent = formatDate(TODAY);
   const [answer, validWords] = await Promise.all([getDailyWord(), getValidGuesses()]);
   state.answer = answer;
   state.validWords = validWords;
   state.validWords.add(state.answer);
-  restoreGame(); renderBoard(); renderKeyboard(); renderStats(); renderGroup(); wireUI(); await initAuth();
+  restoreGame(); renderBoard(); renderKeyboard(); renderStats(); renderGroup(); await initAuth();
 }
 
 init();

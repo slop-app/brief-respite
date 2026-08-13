@@ -33,7 +33,9 @@ button { cursor: pointer; }
 .topbar-actions { display: flex; gap: 8px; align-items: center; }
 .icon-button, .avatar-button { border: 1px solid var(--line); background: transparent; color: var(--muted); width: 34px; height: 34px; border-radius: 50%; transition: .2s ease; }
 .theme-button { display: grid; place-items: center; }
-.theme-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.theme-icon { width: 15px; height: 15px; display: grid; grid-template-columns: repeat(2, 6px); grid-template-rows: repeat(2, 6px); gap: 3px; }
+.theme-icon i { display: block; border-radius: 50%; background: var(--lime); }
+.theme-icon i:nth-child(2) { background: var(--yellow); }.theme-icon i:nth-child(3) { background: var(--muted); }.theme-icon i:nth-child(4) { background: var(--red); }
 .icon-button:hover, .avatar-button:hover { color: var(--ink); border-color: #59605d; background: var(--surface); }
 .avatar-button { color: var(--bg); border: 0; background: var(--lime); font-size: 12px; font-weight: 700; }
 .main-grid { display: grid; grid-template-columns: minmax(460px, 1fr) 390px; gap: 72px; padding: 58px 0 72px; }
