@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101315" />
+    <title>Common Ground — Wordle together</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Common Ground home">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <span>common ground</span>
+        </a>
+        <div class="topbar-actions">
+          <button class="icon-button" id="helpButton" aria-label="How to play" title="How to play">?</button>
+          <button class="icon-button" id="statsButton" aria-label="View your stats" title="Your stats">↗</button>
+          <button class="avatar-button" id="accountButton" aria-label="Account">G</button>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="game-column" aria-label="Wordle game">
+          <div class="eyebrow-row">
+            <div>
+              <p class="eyebrow">Daily word · <span id="gameDate">—</span></p>
+              <h1>Find the common ground.</h1>
+            </div>
+            <div class="streak-pill" title="Current local streak">
+              <span class="streak-flame">✦</span>
+              <span><strong id="streakValue">0</strong> day streak</span>
+            </div>
+          </div>
+
+          <div class="game-card">
+            <div class="board" id="board" aria-label="Wordle board"></div>
+            <div class="message" id="gameMessage" aria-live="polite">Take a guess.</div>
+            <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
+          </div>
+
+          <div class="game-footer">
+            <span id="modeStatus"><span class="status-dot"></span> Playing solo</span>
+            <span class="footer-rule"></span>
+            <span id="nextWord">New word every day</span>
+          </div>
+        </section>
+
+        <aside class="social-column" aria-label="Group and leaderboard">
+          <section class="panel group-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Your circle</p>
+                <h2 id="groupName">No group yet</h2>
+              </div>
+              <span class="live-badge"><span></span> live</span>
+            </div>
+            <p class="panel-copy" id="groupDescription">Create a group or join one with a code. Compare today’s solve with your people.</p>
+            <div class="group-code" id="groupCode" hidden>
+              <span>invite code</span>
+              <strong>—</strong>
+              <button class="copy-button" id="copyCodeButton" aria-label="Copy invite code">copy</button>
+            </div>
+            <div class="member-stack" id="memberStack" hidden></div>
+            <div class="panel-actions">
+              <button class="button button-primary" id="createGroupButton">Create group</button>
+              <button class="button button-quiet" id="joinGroupButton">Join with code</button>
+            </div>
+          </section>
+
+          <section class="panel leaderboard-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Today’s leaderboard</p>
+                <h2>Who got there first?</h2>
+              </div>
+              <span class="date-label" id="leaderboardDate">—</span>
+            </div>
+            <div class="leaderboard" id="leaderboard"></div>
+            <p class="empty-state" id="leaderboardEmpty">Join a group to see your circle here.</p>
+          </section>
+
+          <section class="tip-card">
+            <span class="tip-icon">↗</span>
+            <div>
+              <strong>Invite your people</strong>
+              <p>One code, one shared daily puzzle. No account needed to play.</p>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <dialog class="modal" id="helpModal">
+      <button class="modal-close" data-close-modal aria-label="Close">×</button>
+      <p class="eyebrow">The rules are simple</p>
+      <h2>Find the five-letter word.</h2>
+      <p>Guess the word in six tries. After each guess, the tiles show how close you are.</p>
+      <div class="example-row"><span class="example-tile correct">S</span><span>is in the word and in the right spot.</span></div>
+      <div class="example-row"><span class="example-tile present">A</span><span>is in the word, but somewhere else.</span></div>
+      <div class="example-row"><span class="example-tile absent">D</span><span>is not in the word.</span></div>
+    </dialog>
+
+    <dialog class="modal account-modal" id="accountModal">
+      <button class="modal-close" data-close-modal aria-label="Close">×</button>
+      <p class="eyebrow">Your player</p>
+      <h2 id="accountTitle">Choose a display name.</h2>
+      <p id="accountCopy">No email or password needed. We’ll create a lightweight player profile for this browser.</p>
+      <form id="authForm">
+        <label for="displayNameInput">Display name</label>
+        <input id="displayNameInput" type="text" maxlength="24" autocomplete="nickname" placeholder="Alex" required />
+        <button class="button button-primary full-width" type="submit">Continue</button>
+      </form>
+      <button class="button button-quiet full-width" id="signOutButton" hidden>Sign out</button>
+      <p class="form-note" id="authNote">Your anonymous player ID is stored by Supabase for this browser.</p>
+    </dialog>
+
+    <dialog class="modal group-modal" id="groupModal">
+      <button class="modal-close" data-close-modal aria-label="Close">×</button>
+      <p class="eyebrow" id="groupModalEyebrow">Start a circle</p>
+      <h2 id="groupModalTitle">Create your group.</h2>
+      <p id="groupModalCopy">Give your group a name, then share the invite code with your people.</p>
+      <form id="groupForm">
+        <label for="groupInput" id="groupInputLabel">Group name</label>
+        <input id="groupInput" type="text" maxlength="32" placeholder="Sunday coffee club" required />
+        <button class="button button-primary full-width" type="submit" id="groupSubmit">Create group</button>
+      </form>
+      <p class="form-note" id="groupNote">You can do this in local mode too — it will be saved in this browser.</p>
+    </dialog>
+
+    <dialog class="modal stats-modal" id="statsModal">
+      <button class="modal-close" data-close-modal aria-label="Close">×</button>
+      <p class="eyebrow">Your run</p>
+      <h2>Small words, big streaks.</h2>
+      <div class="stats-grid">
+        <div><strong id="statPlayed">0</strong><span>played</span></div>
+        <div><strong id="statWins">0</strong><span>won</span></div>
+        <div><strong id="statRate">0%</strong><span>win rate</span></div>
+        <div><strong id="statBest">0</strong><span>best streak</span></div>
+      </div>
+      <button class="button button-primary full-width" data-close-modal>Back to puzzle</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
