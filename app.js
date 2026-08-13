@@ -62,7 +62,7 @@ const STATS_STORAGE_KEY = "common-ground-stats";
 const GROUP_STORAGE_KEY = "common-ground-group";
 const LOCAL_SCORES_KEY = "common-ground-scores";
 const THEME_STORAGE_KEY = "common-ground-theme";
-const THEME_NAMES = new Set(["classic", "ocean", "lavender", "sunset"]);
+const THEME_NAMES = new Set(["classic", "ocean", "lavender", "sunset", "rainbow"]);
 const db = window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
