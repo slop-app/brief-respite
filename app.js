@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_muVMCD52kKZKntsh2mwkWg_knLLqA6d";
 // NYT publishes the daily Wordle solution at this date-based JSON endpoint.
 // Leave it blank to use the built-in fallback list instead.
 const WORD_SOURCE_URL = "https://www.nytimes.com/svc/wordle/v2/{date}.json";
-const VALID_GUESSES_URL = "nonwordles.json";
+const VALID_GUESSES_URL = "valid-wordle-words.txt";
 
 const ANSWER_WORDS = [
   "angle", "arise", "badge", "beach", "blaze", "brave", "bread", "bring", "broom", "cabin",
@@ -121,10 +121,10 @@ async function getValidGuesses() {
   try {
     const response = await fetch(VALID_GUESSES_URL, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`Could not load valid guesses (${response.status}).`);
-    const words = await response.json();
-    if (!Array.isArray(words)) throw new Error("Valid guesses must be a JSON array.");
+    const words = await response.text();
     const validWords = words
-      .map((word) => String(word).toLowerCase())
+      .split(/\r?\n/)
+      .map((word) => word.trim().toLowerCase())
       .filter((word) => /^[a-z]{5}$/.test(word));
     if (validWords.length) return new Set([...fallbackWords, ...validWords]);
   } catch (error) {
