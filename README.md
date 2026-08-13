@@ -26,7 +26,7 @@ The frontend talks to Supabase directly. Supabase handles anonymous player ident
 
 ## Optional word source
 
-Set `WORD_SOURCE_URL` in `app.js` to a JSON endpoint that returns `{ "word": "stare" }` or `{ "answer": "stare" }`. The app falls back to its built-in list if the endpoint is empty, unavailable, blocked by CORS, or returns an invalid word. This keeps the daily puzzle playable even when an external endpoint changes.
+`WORD_SOURCE_URL` is configured to use NYT's date-based Wordle response at `https://www.nytimes.com/svc/wordle/v2/{date}.json`. The app reads its `solution` field and falls back to the built-in list if the endpoint is unavailable, blocked by CORS, or returns an invalid value. `nonwordles.json` contains the accepted-guess list, so common words such as `plays` are valid while non-words are rejected. You can set `WORD_SOURCE_URL` to an endpoint that returns `{ "word": "stare" }` or `{ "answer": "stare" }`, or leave it blank to use the built-in list only.
 
 ## Notes
 

@@ -4,9 +4,10 @@
  */
 const SUPABASE_URL = "https://meqqfuywvkcwbzqyqcyc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_muVMCD52kKZKntsh2mwkWg_knLLqA6d";
-// Optional: point this at a small JSON endpoint of your choice. The expected
-// response is { "word": "stare" } or { "answer": "stare" }.
-const WORD_SOURCE_URL = "";
+// NYT publishes the daily Wordle solution at this date-based JSON endpoint.
+// Leave it blank to use the built-in fallback list instead.
+const WORD_SOURCE_URL = "https://www.nytimes.com/svc/wordle/v2/{date}.json";
+const VALID_GUESSES_URL = "nonwordles.json";
 
 const ANSWER_WORDS = [
   "angle", "arise", "badge", "beach", "blaze", "brave", "bread", "bring", "broom", "cabin",
@@ -66,6 +67,7 @@ const db = window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
 
 const state = {
   answer: "",
+  validWords: new Set(),
   guesses: [],
   statuses: [],
   current: "",
@@ -101,16 +103,34 @@ function formatDate(dateString, options = { month: "short", day: "numeric" }) {
 async function getDailyWord() {
   if (WORD_SOURCE_URL) {
     try {
-      const response = await fetch(WORD_SOURCE_URL, { headers: { Accept: "application/json" } });
+      const sourceUrl = WORD_SOURCE_URL.replace("{date}", TODAY);
+      const response = await fetch(sourceUrl, { headers: { Accept: "application/json" } });
       if (response.ok) {
         const payload = await response.json();
-        const candidate = String(payload.word || payload.answer || "").toLowerCase();
+        const candidate = String(payload.word || payload.answer || payload.solution || "").toLowerCase();
         if (/^[a-z]{5}$/.test(candidate)) return candidate;
       }
     } catch (error) { console.info("Optional word source unavailable; using the built-in list.", error); }
   }
   const index = Math.abs(hashString(TODAY)) % ANSWER_WORDS.length;
   return ANSWER_WORDS[index];
+}
+
+async function getValidGuesses() {
+  const fallbackWords = new Set([...ANSWER_WORDS, ...EXTRA_GUESSES]);
+  try {
+    const response = await fetch(VALID_GUESSES_URL, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Could not load valid guesses (${response.status}).`);
+    const words = await response.json();
+    if (!Array.isArray(words)) throw new Error("Valid guesses must be a JSON array.");
+    const validWords = words
+      .map((word) => String(word).toLowerCase())
+      .filter((word) => /^[a-z]{5}$/.test(word));
+    if (validWords.length) return new Set([...fallbackWords, ...validWords]);
+  } catch (error) {
+    console.info("Valid guess list unavailable; using the built-in fallback list.", error);
+  }
+  return fallbackWords;
 }
 
 function renderBoard() {
@@ -173,8 +193,7 @@ function handleKey(key) {
 
 function submitGuess() {
   if (state.current.length !== 5) return showMessage("Five letters, please.", "error");
-  const validWords = new Set([...ANSWER_WORDS, ...EXTRA_GUESSES, state.answer]);
-  if (!validWords.has(state.current)) return showMessage("That word isn’t in the list.", "error");
+  if (!state.validWords.has(state.current)) return showMessage("That word isn’t in the list.", "error");
   const guess = state.current;
   const statuses = evaluateGuess(guess);
   state.guesses.push(guess); state.statuses.push(statuses); state.current = "";
@@ -348,7 +367,11 @@ function wireUI() {
 async function init() {
   $("gameDate").textContent = formatDate(TODAY, { weekday: "short", month: "short", day: "numeric" });
   $("leaderboardDate").textContent = formatDate(TODAY);
-  state.answer = await getDailyWord(); restoreGame(); renderBoard(); renderKeyboard(); renderStats(); renderGroup(); wireUI(); await initAuth();
+  const [answer, validWords] = await Promise.all([getDailyWord(), getValidGuesses()]);
+  state.answer = answer;
+  state.validWords = validWords;
+  state.validWords.add(state.answer);
+  restoreGame(); renderBoard(); renderKeyboard(); renderStats(); renderGroup(); wireUI(); await initAuth();
 }
 
 init();
