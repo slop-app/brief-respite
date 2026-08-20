@@ -4,9 +4,12 @@
  */
 const SUPABASE_URL = "https://meqqfuywvkcwbzqyqcyc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_muVMCD52kKZKntsh2mwkWg_knLLqA6d";
-// NYT publishes the daily Wordle solution at this date-based JSON endpoint.
-// Leave it blank to use the built-in fallback list instead.
-const WORD_SOURCE_URL = "https://www.nytimes.com/svc/wordle/v2/{date}.json";
+// Browsers cannot call NYT's endpoint directly because NYT does not allow
+// cross-origin reads. This Supabase Edge Function fetches it server-side.
+// Deploy supabase/functions/wordle, or leave this blank to use the fallback.
+const WORD_SOURCE_URL = SUPABASE_URL
+  ? `${SUPABASE_URL}/functions/v1/wordle?date={date}`
+  : "";
 const VALID_GUESSES_URL = "valid-wordle-words.txt";
 
 const ANSWER_WORDS = [

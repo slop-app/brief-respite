@@ -1,0 +1,2 @@
+[functions.wordle]
+verify_jwt = false

@@ -24,9 +24,19 @@ The game works without any setup. It uses a built-in daily word list and saves y
 
 The frontend talks to Supabase directly. Supabase handles anonymous player identities and the database; GitHub Pages only serves the static files, so there is no need for a separate backend host for this scope.
 
-## Optional word source
+## NYT Wordle source
 
-`WORD_SOURCE_URL` is configured to use NYT's date-based Wordle response at `https://www.nytimes.com/svc/wordle/v2/{date}.json`. The app reads its `solution` field and falls back to the built-in list if the endpoint is unavailable, blocked by CORS, or returns an invalid value. `valid-wordle-words.txt` contains the accepted-guess list, so common words such as `plays` are valid while non-words are rejected. You can set `WORD_SOURCE_URL` to an endpoint that returns `{ "word": "stare" }` or `{ "answer": "stare" }`, or leave it blank to use the built-in list only.
+NYT's Wordle endpoint does not include an `Access-Control-Allow-Origin` header, so a browser hosted on GitHub Pages cannot read it directly. The app therefore calls the small Supabase Edge Function in `supabase/functions/wordle`, which fetches the NYT response server-side and returns only the solution with CORS enabled.
+
+Install the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), log in, and deploy the function to the project configured by `SUPABASE_URL`:
+
+```bash
+supabase login
+supabase link --project-ref meqqfuywvkcwbzqyqcyc
+supabase functions deploy wordle --no-verify-jwt
+```
+
+The function is public but can only fetch a date-validated Wordle URL; it is not an open proxy. The frontend still falls back to its built-in daily list if the function or NYT is unavailable. `valid-wordle-words.txt` contains the accepted-guess list, so common words such as `plays` are valid while non-words are rejected.
 
 ## Notes
 
